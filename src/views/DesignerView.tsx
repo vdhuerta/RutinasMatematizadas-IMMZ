@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { AlertCircle, BrainCircuit, Check, GripVertical, Lightbulb, MousePointer2, Plus, Quote, Search, Undo2, X } from 'lucide-react';
+import { AlertCircle, BrainCircuit, Check, CheckCircle2, Eye, EyeOff, GripVertical, Lightbulb, MousePointer2, Plus, Quote, Search, Undo2, X } from 'lucide-react';
 import { MATH_SITUATIONS, ROUTINES } from '../data/rutinas';
+import { isCoherent } from '../data/didactics';
 import { RoutineIcon } from '../components/Icons';
 import { RoutineAnalysisModal } from '../components/Modals';
 import type { Routine, TimelineSlot } from '../types';
@@ -36,12 +37,13 @@ function PaletteItem({ r, overlay = false }: { r: Routine; overlay?: boolean }) 
   );
 }
 
-function RoutineCard({ slot, overlay = false, onLupa, onClearSituation }: { slot: TimelineSlot; overlay?: boolean; onLupa?: () => void; onClearSituation?: () => void }) {
+function RoutineCard({ slot, overlay = false, onLupa, onClearSituation, correctness = null }: { slot: TimelineSlot; overlay?: boolean; onLupa?: () => void; onClearSituation?: () => void; correctness?: boolean | null }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `card:${slot.id}` });
   const r = slot.routine!; const sit = MATH_SITUATIONS.find((m) => m.id === slot.mathSituationId);
+  const revealBorder = correctness === true ? '!border-emerald-500' : correctness === false ? '!border-rose-400' : '';
   return (
     <div ref={overlay ? undefined : setNodeRef} data-card-slot={slot.id} {...(overlay ? {} : attributes)} {...(overlay ? {} : listeners)} style={{ touchAction: 'none', opacity: isDragging && !overlay ? 0.4 : 1 }}
-      className={`relative flex h-full min-h-[88px] w-full cursor-grab select-none items-start gap-4 rounded-xl border p-4 active:cursor-grabbing ${r.color} ${overlay ? 'rotate-1 scale-105 shadow-lg' : ''}`}>
+      className={`relative flex h-full min-h-[88px] w-full cursor-grab select-none items-start gap-4 rounded-xl border p-4 active:cursor-grabbing ${r.color} ${overlay ? 'rotate-1 scale-105 shadow-lg' : ''} ${revealBorder}`}>
       <div className="rounded-xl bg-white/60 p-2.5"><RoutineIcon name={r.iconName} size={20} /></div>
       <div className="min-w-0 flex-1 pt-0.5 pr-8">
         <h3 className="text-sm">{r.label}</h3>
@@ -50,8 +52,13 @@ function RoutineCard({ slot, overlay = false, onLupa, onClearSituation }: { slot
             {onClearSituation && <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onClearSituation(); }} className="ml-0.5 shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-200/80 hover:text-rose-600" title="Sacar situación matemática" aria-label="Sacar situación matemática"><X size={12} /></button>}</div>
         ) : <p className="micro mt-2 flex items-center gap-1.5 !text-slate-600"><AlertCircle size={14} />Falta matematizar</p>}
       </div>
+      {correctness !== null && (
+        <span className="absolute right-3 top-3" title={correctness ? 'Combinación coherente' : 'Combinación poco coherente'} data-testid="reveal-badge">
+          {correctness ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-rose-500" />}
+        </span>
+      )}
       {onLupa && (
-        <span className="group/tip absolute right-3 top-3">
+        <span className="group/tip absolute right-3 top-3" style={correctness !== null ? { right: '2.1rem' } : undefined}>
           <button type="button" data-analysis-btn onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onLupa(); }} className="rounded-lg bg-white/60 p-1.5 text-slate-500 shadow-xs transition hover:bg-white hover:text-brand-500 focus-visible:bg-white focus-visible:text-brand-500" aria-label="Ver la Devolución Didáctica de esta rutina"><Search size={15} /></button>
           <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 z-30 mb-1.5 w-max max-w-[210px] rounded-lg bg-brand-500 px-2.5 py-1.5 text-left text-[11px] leading-snug text-white opacity-0 shadow-lg transition group-hover/tip:opacity-100 group-focus-within/tip:opacity-100">
             Usa la lupa para mirar la Devolución Didáctica de esta rutina<i className="absolute right-3 top-full h-0 w-0 border-x-[5px] border-t-[5px] border-x-transparent border-t-brand-500" />
@@ -61,9 +68,10 @@ function RoutineCard({ slot, overlay = false, onLupa, onClearSituation }: { slot
   );
 }
 
-function SlotRow({ slot, active, onSelect, onLupa, onClearSituation }: { slot: TimelineSlot; active: boolean; onSelect: () => void; onLupa: () => void; onClearSituation: () => void }) {
+function SlotRow({ slot, active, onSelect, onLupa, onClearSituation, revealAnswers }: { slot: TimelineSlot; active: boolean; onSelect: () => void; onLupa: () => void; onClearSituation: () => void; revealAnswers: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot:${slot.id}` });
   const [t, label] = slot.timeLabel.split(' - ');
+  const correctness = revealAnswers && slot.routine && slot.mathSituationId ? isCoherent(slot.routine.id, slot.mathSituationId) : null;
   return (
     <div className="flex min-h-[92px] items-stretch" data-slot-id={slot.id}>
       <div className="relative flex w-24 shrink-0 flex-col items-end py-3 pr-4">
@@ -72,7 +80,7 @@ function SlotRow({ slot, active, onSelect, onLupa, onClearSituation }: { slot: T
       </div>
       <div ref={setNodeRef} data-zone={`slot-${slot.id}`} role="button" tabIndex={0} onClick={() => slot.routine && onSelect()} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && slot.routine && onSelect()}
         className={`ml-4 flex-1 rounded-xl transition ${active ? 'ring-2 ring-brand-500 ring-offset-2' : ''} ${slot.routine ? 'cursor-pointer' : `border-2 border-dashed ${isOver ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'} flex items-center justify-center text-slate-400`} ${isOver && slot.routine ? 'ring-2 ring-brand-300' : ''}`}>
-        {!slot.routine ? <div className="flex items-center gap-2 text-sm"><Plus size={18} className="text-slate-300" /><span className="select-none">Arrastra una rutina aquí</span></div> : <RoutineCard slot={slot} onLupa={onLupa} onClearSituation={onClearSituation} />}
+        {!slot.routine ? <div className="flex items-center gap-2 text-sm"><Plus size={18} className="text-slate-300" /><span className="select-none">Arrastra una rutina aquí</span></div> : <RoutineCard slot={slot} onLupa={onLupa} onClearSituation={onClearSituation} correctness={correctness} />}
       </div>
     </div>
   );
@@ -89,6 +97,7 @@ export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRouti
   const [dragSlot, setDragSlot] = useState<TimelineSlot | null>(null);
   const [lupaId, setLupaId] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
+  const [revealAnswers, setRevealAnswers] = useState(false);
   const [tips, setTips] = useState<Record<string, boolean>>({});
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const active = slots.find((s) => s.id === activeId);
@@ -124,8 +133,20 @@ export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRouti
 
         {/* Columna 2 · Paso 1 */}
         <section className="card flex flex-col p-5 md:col-span-5" data-testid="col-paso1">
-          <ColHeader kicker="Paso 1" title="Línea de Tiempo" summary="Organiza tu jornada: ubica cada rutina en un momento del día. Toca una rutina para configurarla y usa la lupa para recibir su devolución." right={<span className="pill border-slate-200 text-[10px] text-slate-500" data-testid="progress">{done}/{slots.length} matematizadas</span>} />
-          <div className="space-y-3">{slots.map((s) => <SlotRow key={s.id} slot={s} active={activeId === s.id} onSelect={() => setActiveId(s.id)} onLupa={() => openLupa(s)} onClearSituation={() => onSetSituation(s.id, null)} />)}</div>
+          <ColHeader kicker="Paso 1" title="Línea de Tiempo" summary="Organiza tu jornada: ubica cada rutina en un momento del día. Toca una rutina para configurarla y usa la lupa para recibir su devolución." right={
+            <div className="flex items-center gap-1.5">
+              <span className="pill border-slate-200 text-[10px] text-slate-500" data-testid="progress">{done}/{slots.length} matematizadas</span>
+              <span className="group/eye relative">
+                <button type="button" data-testid="btn-reveal" onClick={() => setRevealAnswers((v) => !v)} aria-pressed={revealAnswers} aria-label={revealAnswers ? 'Ocultar aciertos y errores' : 'Mostrar aciertos y errores'}
+                  className={`rounded-lg border p-1.5 transition ${revealAnswers ? 'border-brand-200 bg-brand-50 text-brand-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'}`}>
+                  {revealAnswers ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+                <span role="tooltip" className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 w-max max-w-[190px] rounded-lg bg-brand-500 px-2.5 py-1.5 text-left text-[11px] leading-snug text-white opacity-0 shadow-lg transition group-hover/eye:opacity-100">
+                  {revealAnswers ? 'Ocultar si cada combinación es correcta' : 'Mostrar en las tarjetas si cada combinación es correcta'}
+                </span>
+              </span>
+            </div>} />
+          <div className="space-y-3">{slots.map((s) => <SlotRow key={s.id} slot={s} active={activeId === s.id} onSelect={() => setActiveId(s.id)} onLupa={() => openLupa(s)} onClearSituation={() => onSetSituation(s.id, null)} revealAnswers={revealAnswers} />)}</div>
           <div className="mt-auto space-y-3 border-t border-slate-100 pt-4">
             <button data-testid="btn-dev" onClick={() => setShowHint((v) => !v)} className="btn-primary w-full justify-center">Devolución Didáctica</button>
             {showHint && <p className="flex items-center justify-center gap-1.5 rounded-xl border border-brand-100 bg-brand-50 p-3 text-center text-xs text-brand-600" data-testid="dev-hint">Presiona sobre la <Search size={14} className="shrink-0" /> para recibir la Devolución Didáctica</p>}
