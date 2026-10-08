@@ -9,6 +9,11 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, a
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 await page.goto(process.env.URL || 'http://localhost:4173');
+// Identificación inicial (NRC + Forma), bloqueante en el primer inicio (sin datos guardados en este perfil de navegador).
+await page.waitForSelector('[data-testid="nrc-input"]');
+await page.fill('[data-testid="nrc-input"]', '12345');
+await page.selectOption('[data-testid="forma-input"]', 'A');
+await page.click('[data-testid="identification-submit"]');
 await page.waitForSelector('[data-testid="palette"]');
 await page.click('button:has-text("Comenzar a planificar")').catch(() => {});
 

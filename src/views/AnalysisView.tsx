@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BookMarked, CheckCircle2, Download, FileText, GraduationCap, History, Layers, Layout, MousePointerClick, Save, Search, ShieldCheck, Target, Brain, Trophy, XCircle, type LucideIcon } from 'lucide-react';
-import { MATH_SITUATIONS } from '../data/rutinas';
+import { MATH_SITUATIONS, getForma } from '../data/rutinas';
 import { PHASE_TITLE, isCoherent } from '../data/didactics';
 import { computeStats, slotPhase, type HistoryEvent, type Session } from '../lib/metrics';
 import { buildReport, describeEvent, selfCheck } from '../lib/immzReport';
@@ -19,9 +19,10 @@ const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
   { key: 'MARCO', label: 'DigCompEdu y Fundamento', icon: BookMarked },
   { key: 'TRABAJO', label: 'Hoja de Trabajo', icon: Layout },
 ];
-interface Props { history: HistoryEvent[]; session: Session; classNumber: number | null; name: string; onName: (n: string) => void; onClear: () => void; reflection: SelfReflection; onReflection: (r: SelfReflection) => void }
+interface Props { history: HistoryEvent[]; session: Session; classNumber: number | null; name: string; onName: (n: string) => void; onClear: () => void; reflection: SelfReflection; onReflection: (r: SelfReflection) => void; judgmentEnabled: boolean; nrc: string | null; formaId: string }
 
-export default function AnalysisView({ history, session, classNumber, name, onName, onClear, reflection, onReflection }: Props) {
+export default function AnalysisView({ history, session, classNumber, name, onName, onClear, reflection, onReflection, judgmentEnabled, nrc, formaId }: Props) {
+  const forma = getForma(formaId);
   const [tab, setTab] = useState<Tab>('RESUMEN');
   const [askName, setAskName] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -30,14 +31,14 @@ export default function AnalysisView({ history, session, classNumber, name, onNa
   const model = useMemo(() => buildAnalysisModel(history, session), [history, session]);
   const stats = useMemo(() => computeStats(history, session), [history, session]);
   const design = useMemo(() => computeDesign(session.slots, session.plan, reflection), [session, reflection]);
-  const check = useMemo(() => { const r = buildReport({ participantName: name || 'Participante', classNumber, session, history, reflection }); return selfCheck(r, classNumber, name || 'Participante'); }, [history, session, classNumber, name, reflection]);
+  const check = useMemo(() => { const r = buildReport({ participantName: name || 'Participante', classNumber, session, history, reflection, judgmentEnabled, nrc, formId: forma.id, contentLevel: forma.contentLevel, contentId: forma.contentId }); return selfCheck(r, classNumber, name || 'Participante'); }, [history, session, classNumber, name, reflection, judgmentEnabled, nrc, forma]);
   const parsed = check.parsed;
 
   const generate = async (kind: 'html' | 'pdf') => {
     if (!name.trim()) { setAskName(true); return; }
     setBusy(true);
     try {
-      const r = buildReport({ participantName: name, classNumber, session, history, reflection });
+      const r = buildReport({ participantName: name, classNumber, session, history, reflection, judgmentEnabled, nrc, formId: forma.id, contentLevel: forma.contentLevel, contentId: forma.contentId });
       const c = selfCheck(r, classNumber, name);
       setLast({ file: r.fileName, ok: c.ok, issues: c.issues });
       if (kind === 'html') downloadHtml(r.html, r.fileName); else await downloadPdf(r);

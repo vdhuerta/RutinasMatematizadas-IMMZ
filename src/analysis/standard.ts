@@ -21,6 +21,7 @@ export interface AppAnalysisConfig {
   moduleLabel: string;               // «Módulo de Evaluación Formativa Digital - <app>»
   title: string;                     // H2
   subtitle: string;
+  reportSubtitle: string;            // Subtítulo fijo bajo «Análisis Metacognitivo» en el reporte HTML descargable
   appropriation: { blurb: string; weights: string };
   gaugeIntro: { title: string; p1: string; hint: string };
   dimB: { kicker: string; title: string; subIndexLabel: string };

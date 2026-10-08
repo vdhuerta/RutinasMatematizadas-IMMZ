@@ -1,6 +1,7 @@
 import type { Routine, MathSituation } from '../types';
 
-export const ROUTINES: Routine[] = [
+/** Forma A (2do Tramo: Niveles Medios) — contenido original de la app. */
+const FORMA_A_ROUTINES: Routine[] = [
   { id: 'llegada', label: 'Llegada y Saludo', iconName: 'Sun', color: 'bg-amber-100 text-amber-700 border-amber-300' },
   { id: 'higiene', label: 'Higiene y Baño', iconName: 'Droplets', color: 'bg-sky-100 text-sky-700 border-sky-300' },
   { id: 'colacion', label: 'Colación / Comida', iconName: 'Apple', color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
@@ -9,6 +10,31 @@ export const ROUTINES: Routine[] = [
   { id: 'siesta', label: 'Descanso / Siesta', iconName: 'Moon', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
   { id: 'despedida', label: 'Despedida', iconName: 'Hand', color: 'bg-purple-100 text-purple-700 border-purple-300' }
 ];
+
+/** Forma B (1er Tramo: Sala Cuna) — mismas 7 funciones didácticas de la jornada, adaptadas a lactantes. */
+const FORMA_B_ROUTINES: Routine[] = [
+  { id: 'bienvenida_b', label: 'Llegada y Acogida', iconName: 'Sunrise', color: 'bg-rose-100 text-rose-700 border-rose-300' },
+  { id: 'muda_b', label: 'Muda y Cuidado Corporal', iconName: 'Shirt', color: 'bg-cyan-100 text-cyan-700 border-cyan-300' },
+  { id: 'alimentacion_b', label: 'Alimentación y Mamadera', iconName: 'Milk', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+  { id: 'exploracion_b', label: 'Exploración Sensorial', iconName: 'Sparkles', color: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300' },
+  { id: 'guardado_b', label: 'Guardado de Mantas y Objetos', iconName: 'Box', color: 'bg-teal-100 text-teal-700 border-teal-300' },
+  { id: 'descanso_b', label: 'Sueño y Descanso', iconName: 'Moon', color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { id: 'entrega_b', label: 'Entrega a la Familia', iconName: 'Users', color: 'bg-violet-100 text-violet-700 border-violet-300' }
+];
+
+/** Forma C (3er Tramo: Niveles de Transición) — mismas 7 funciones, para preescolares mayores. */
+const FORMA_C_ROUTINES: Routine[] = [
+  { id: 'registro_c', label: 'Llegada y Registro de Asistencia', iconName: 'ListChecks', color: 'bg-red-100 text-red-700 border-red-300' },
+  { id: 'autocuidado_c', label: 'Higiene y Autocuidado', iconName: 'Droplets', color: 'bg-teal-100 text-teal-700 border-teal-300' },
+  { id: 'economia_c', label: 'Colación y Reparto de Materiales', iconName: 'Package', color: 'bg-amber-100 text-amber-700 border-amber-300' },
+  { id: 'juegos_c', label: 'Patio y Juegos Reglados', iconName: 'Dices', color: 'bg-green-100 text-green-700 border-green-300' },
+  { id: 'biblioteca_c', label: 'Orden de la Biblioteca de Aula', iconName: 'BookOpen', color: 'bg-slate-100 text-slate-700 border-slate-300' },
+  { id: 'lectura_c', label: 'Tiempo de Relajación y Lectura', iconName: 'Moon', color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { id: 'sintesis_c', label: 'Despedida y Síntesis del Día', iconName: 'LogOut', color: 'bg-pink-100 text-pink-700 border-pink-300' }
+];
+
+/** Compat: Forma A, para código que aún no distingue formas. Preferir getForma(formaId).routines. */
+export const ROUTINES: Routine[] = FORMA_A_ROUTINES;
 
 export const MATH_SITUATIONS: MathSituation[] = [
   { 
@@ -48,6 +74,20 @@ export const MATH_SITUATIONS: MathSituation[] = [
     description: 'Organizar secuencias según una propiedad (ej. de más corto a más largo, o por pesos en el cesto del tesoro).' 
   }
 ];
+
+/** Una Forma de contenido paralelo (A/B/C), igual en estructura al Simulador TSD: mismas 7
+ *  rutinas-función, mismas 6 situaciones matemáticas (genéricas BCEP, no cambian entre formas) y
+ *  los mismos 11 pares de coherencia con idéntica distribución por rutina (1-2-2-2-2-1-1) — así
+ *  las tres formas son estadísticamente equivalentes y solo cambia el contexto cotidiano. */
+export interface Forma { id: 'A' | 'B' | 'C'; nombre: string; nivelBcep: string; contentLevel: number; contentId: string; routines: Routine[] }
+export const FORMAS: Forma[] = [
+  { id: 'A', nombre: 'Jornada de Rutinas de Cuidado', nivelBcep: '2do Tramo: Niveles Medios', contentLevel: 1, contentId: 'rutinas_cuidado_completo_7x6', routines: FORMA_A_ROUTINES },
+  { id: 'B', nombre: 'Jornada de Sala Cuna', nivelBcep: '1er Tramo: Sala Cuna', contentLevel: 2, contentId: 'rutinas_sala_cuna_7x6', routines: FORMA_B_ROUTINES },
+  { id: 'C', nombre: 'Jornada de Transición', nivelBcep: '3er Tramo: Niveles de Transición', contentLevel: 3, contentId: 'rutinas_transicion_7x6', routines: FORMA_C_ROUTINES },
+];
+export const DEFAULT_FORMA_ID: Forma['id'] = 'A';
+/** Devuelve la Forma por id; si no se reconoce (o la guardada ya no existe), usa la Forma A. */
+export const getForma = (id: string | null | undefined): Forma => FORMAS.find((f) => f.id === id) ?? FORMAS[0];
 
 export const NUCLEOS_BCEP = [
   'Pensamiento Matemático',

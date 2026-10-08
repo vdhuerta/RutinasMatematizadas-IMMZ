@@ -1,5 +1,5 @@
 import { INDICATORS } from '../config';
-import { computeIndicators, computeStats, feedbackCounts, indicesOf, type HistoryEvent, type Session } from '../lib/metrics';
+import { computeIndicators, computeStats, indicesOf, type HistoryEvent, type Session } from '../lib/metrics';
 import type { AnalysisModel, AppAnalysisConfig, Verdict } from './standard';
 import { RUTINAS_ANALYSIS } from './rutinasConfig';
 
@@ -21,11 +21,10 @@ export function buildAnalysisModel(history: HistoryEvent[], session: Session, cf
   const raw = computeIndicators(history, session);
   const idx = indicesOf(raw);
   const st = computeStats(history, session);
-  const fb = feedbackCounts(history, session);
   const indicators = INDICATORS.map((d) => {
     const r = raw.find((x) => x.code === d.id)!; const m = cfg.indicators[d.id];
     return { ...m, code: d.id, dimension: d.dimension, subdimension: d.sub === 'IDCD' ? null : (d.sub as 'AO' | 'AC'), value: r.value, hasEvidence: r.value !== null, formula: r.formula, feedback: r.value === null ? 'Sin evidencia registrada en esta sesión.' : r.feedback, n: r.denominator,
-      breakdown: d.id === 'IM4' && fb.available > 0 ? `${fb.consulted} de ${fb.available} devoluciones consultadas` : undefined };
+      breakdown: d.id === 'IM4' && r.denominator > 0 ? `${r.numerator} de ${r.denominator} devoluciones con revisión asociada` : undefined };
   });
   return { cfg, indicators, raw, appropriation: { value: st.appropriation, accuracy: st.accuracy, efficiency: st.efficiency, reflectionFactor: st.reflectionFactor, hasEvidence: st.hasEvidence },
     immz: idx.immz, immzAO: idx.immzAO, immzAC: idx.immzAC, idcd: idx.idcd, immg: idx.immg, verdictA: verdictA(idx.immz), verdictB: verdictB(idx.idcd), verdictGlobal: globalVerdict(idx.immg) };

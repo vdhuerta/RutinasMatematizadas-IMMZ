@@ -1,19 +1,24 @@
 import { useState, type ReactNode } from 'react';
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { AlertCircle, BrainCircuit, Check, CheckCircle2, Eye, EyeOff, GripVertical, Lightbulb, MousePointer2, Plus, Quote, Search, Undo2, X } from 'lucide-react';
-import { MATH_SITUATIONS, ROUTINES } from '../data/rutinas';
+import { AlertCircle, BrainCircuit, Check, CheckCircle2, GripVertical, Lightbulb, MousePointer2, PenLine, Plus, Quote, Search, Undo2, X } from 'lucide-react';
+import { MATH_SITUATIONS } from '../data/rutinas';
 import { isCoherent } from '../data/didactics';
 import { RoutineIcon } from '../components/Icons';
 import { RoutineAnalysisModal } from '../components/Modals';
 import type { Routine, TimelineSlot } from '../types';
 
 interface Props {
+  /** Las 7 rutinas de la Forma activa (A/B/C) — ver getForma(formaId) en data/rutinas.ts. */
+  routines: Routine[];
   slots: TimelineSlot[];
   onPlace: (slotId: number, r: Routine) => void;
   onMoveCard: (fromId: number, toId: number) => void;
   onRemoveRoutine: (slotId: number) => void;
-  onSetSituation: (slotId: number, situationId: string | null) => void;
+  onSetSituation: (slotId: number, situationId: string | null, justification?: string) => void;
   onAnalysis: (kind: 'rutina' | 'situacion', routineId: string) => void;
+  /** El OJO (ahora global, en la barra superior entre Análisis y Ayuda): revela qué oculta cada
+   *  decisión, tanto en la línea de tiempo (Paso 1) como en las situaciones no elegidas de Paso 2. */
+  revealAnswers: boolean;
 }
 
 /** Cabecera común de las tres cajas: etiqueta, título y resumen, con altura fija para que queden alineadas. */
@@ -91,14 +96,14 @@ function Deck({ slots, children }: { slots: TimelineSlot[]; children: ReactNode 
   return <div ref={setNodeRef} data-zone="deck" data-placed={slots.filter((s) => s.routine).length} className={`flex flex-1 flex-col rounded-xl transition ${isOver ? 'bg-brand-50 ring-2 ring-brand-300' : ''}`}>{children}</div>;
 }
 
-export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRoutine, onSetSituation, onAnalysis }: Props) {
+export default function DesignerView({ routines, slots, onPlace, onMoveCard, onRemoveRoutine, onSetSituation, onAnalysis, revealAnswers }: Props) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [dragPal, setDragPal] = useState<Routine | null>(null);
   const [dragSlot, setDragSlot] = useState<TimelineSlot | null>(null);
   const [lupaId, setLupaId] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
-  const [revealAnswers, setRevealAnswers] = useState(false);
   const [tips, setTips] = useState<Record<string, boolean>>({});
+  const [justDraft, setJustDraft] = useState<Record<number, string>>({});
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const active = slots.find((s) => s.id === activeId);
   const placed = new Set(slots.filter((s) => s.routine).map((s) => s.routine!.id));
@@ -109,7 +114,7 @@ export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRouti
   const onDragEnd = (e: DragEndEvent) => {
     setDragPal(null); setDragSlot(null);
     const from = String(e.active.id); const to = e.over ? String(e.over.id) : '';
-    if (from.startsWith('pal:') && to.startsWith('slot:')) { const r = ROUTINES.find((x) => x.id === from.slice(4)); const sid = Number(to.slice(5)); if (r) { onPlace(sid, r); setActiveId(sid); } }
+    if (from.startsWith('pal:') && to.startsWith('slot:')) { const r = routines.find((x) => x.id === from.slice(4)); const sid = Number(to.slice(5)); if (r) { onPlace(sid, r); setActiveId(sid); } }
     else if (from.startsWith('card:')) {
       const fid = Number(from.slice(5));
       if (to === 'deck') { onRemoveRoutine(fid); if (activeId === fid) setActiveId(null); }
@@ -118,14 +123,14 @@ export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRouti
   };
 
   return (
-    <DndContext sensors={sensors} onDragStart={(e) => { const id = String(e.active.id); setDragPal(id.startsWith('pal:') ? ROUTINES.find((r) => `pal:${r.id}` === id) ?? null : null); setDragSlot(id.startsWith('card:') ? slots.find((s) => s.id === Number(id.slice(5))) ?? null : null); }} onDragEnd={onDragEnd} onDragCancel={() => { setDragPal(null); setDragSlot(null); }}>
+    <DndContext sensors={sensors} onDragStart={(e) => { const id = String(e.active.id); setDragPal(id.startsWith('pal:') ? routines.find((r) => `pal:${r.id}` === id) ?? null : null); setDragSlot(id.startsWith('card:') ? slots.find((s) => s.id === Number(id.slice(5))) ?? null : null); }} onDragEnd={onDragEnd} onDragCancel={() => { setDragPal(null); setDragSlot(null); }}>
       <RoutineAnalysisModal slot={lupaSlot} open={lupaId !== null} onClose={() => setLupaId(null)} />
       <div className="mx-auto grid max-w-7xl items-stretch gap-5 p-4 md:grid-cols-12 lg:p-6">
         {/* Columna 1 · Rutinas (mazo) */}
         <section className="card flex flex-col p-5 md:col-span-3" data-testid="col-rutinas">
-          <ColHeader kicker="Mazo" title="Rutinas" summary="Las 7 rutinas de cuidado de la jornada. Arrástralas a la línea de tiempo; cada una se usa una sola vez." right={<span className="pill !py-0 border-rose-200 bg-rose-50 text-rose-600" data-testid="remaining">{ROUTINES.length - placed.size}</span>} />
+          <ColHeader kicker="Mazo" title="Rutinas" summary="Las 7 rutinas de cuidado de la jornada. Arrástralas a la línea de tiempo; cada una se usa una sola vez." right={<span className="pill !py-0 border-rose-200 bg-rose-50 text-rose-600" data-testid="remaining">{routines.length - placed.size}</span>} />
           <Deck slots={slots}>
-            <div className="grid gap-2.5" data-testid="palette">{ROUTINES.map((r) => placed.has(r.id) ? <div key={r.id} data-empty-slot={r.id} className="h-[50px] rounded-xl border-2 border-dashed border-slate-200" /> : <PaletteItem key={r.id} r={r} />)}</div>
+            <div className="grid gap-2.5" data-testid="palette">{routines.map((r) => placed.has(r.id) ? <div key={r.id} data-empty-slot={r.id} className="h-[50px] rounded-xl border-2 border-dashed border-slate-200" /> : <PaletteItem key={r.id} r={r} />)}</div>
             <p className="mt-3 flex items-start gap-1.5 text-[11px] italic text-slate-500"><Undo2 size={13} className="mt-0.5 shrink-0" />Para sacar una rutina de la línea de tiempo, arrástrala de vuelta aquí. En tablet, mantén presionada la tarjeta.</p>
             <div className="card relative mt-auto overflow-hidden bg-brand-50 p-4"><Quote size={52} className="absolute -right-3 -top-3 text-brand-100" /><p className="relative text-sm italic text-brand-600">«Las rutinas de cuidado no son tiempos vacíos, sino contextos fundamentales para el aprendizaje.»</p><span className="micro relative mt-2 block !text-brand-400">— Gonzalez-Mena &amp; Eyer</span></div>
           </Deck>
@@ -134,18 +139,7 @@ export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRouti
         {/* Columna 2 · Paso 1 */}
         <section className="card flex flex-col p-5 md:col-span-5" data-testid="col-paso1">
           <ColHeader kicker="Paso 1" title="Línea de Tiempo" summary="Organiza tu jornada: ubica cada rutina en un momento del día. Toca una rutina para configurarla y usa la lupa para recibir su devolución." right={
-            <div className="flex items-center gap-1.5">
-              <span className="pill border-slate-200 text-[10px] text-slate-500" data-testid="progress">{done}/{slots.length} matematizadas</span>
-              <span className="group/eye relative">
-                <button type="button" data-testid="btn-reveal" onClick={() => setRevealAnswers((v) => !v)} aria-pressed={revealAnswers} aria-label={revealAnswers ? 'Ocultar aciertos y errores' : 'Mostrar aciertos y errores'}
-                  className={`rounded-lg border p-1.5 transition ${revealAnswers ? 'border-brand-200 bg-brand-50 text-brand-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'}`}>
-                  {revealAnswers ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-                <span role="tooltip" className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 w-max max-w-[190px] rounded-lg bg-brand-500 px-2.5 py-1.5 text-left text-[11px] leading-snug text-white opacity-0 shadow-lg transition group-hover/eye:opacity-100">
-                  {revealAnswers ? 'Ocultar si cada combinación es correcta' : 'Mostrar en las tarjetas si cada combinación es correcta'}
-                </span>
-              </span>
-            </div>} />
+            <span className="pill border-slate-200 text-[10px] text-slate-500" data-testid="progress">{done}/{slots.length} matematizadas</span>} />
           <div className="space-y-3">{slots.map((s) => <SlotRow key={s.id} slot={s} active={activeId === s.id} onSelect={() => setActiveId(s.id)} onLupa={() => openLupa(s)} onClearSituation={() => onSetSituation(s.id, null)} revealAnswers={revealAnswers} />)}</div>
           <div className="mt-auto space-y-3 border-t border-slate-100 pt-4">
             <button data-testid="btn-dev" onClick={() => setShowHint((v) => !v)} className="btn-primary w-full justify-center">Devolución Didáctica</button>
@@ -157,18 +151,28 @@ export default function DesignerView({ slots, onPlace, onMoveCard, onRemoveRouti
         <section className="card flex flex-col p-5 md:col-span-4" data-testid="col-paso2">
           <ColHeader kicker="Paso 2" title="Situación Matemática" summary="Elige la situación problémica matemática que integrarás en la rutina seleccionada. Los tips te orientan." />
           {active?.routine ? (
-            <div className="flex flex-1 flex-col space-y-4" key={active.id}>
-              <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"><div className={`rounded-xl border p-2.5 ${active.routine.color}`}><RoutineIcon name={active.routine.iconName} size={20} /></div><div><h3 className="text-sm text-slate-900">{active.routine.label}</h3><p className="micro mt-0.5">{active.timeLabel}</p></div></div>
+            <div className="flex flex-1 flex-col space-y-3" key={active.id}>
+              <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5"><div className={`rounded-xl border p-2 ${active.routine.color}`}><RoutineIcon name={active.routine.iconName} size={18} /></div><div><h3 className="text-sm text-slate-900">{active.routine.label}</h3><p className="micro mt-0.5">{active.timeLabel}</p></div></div>
               <h4 className="text-sm text-slate-900">¿Qué situación problémica matemática integrarás en esta rutina?</h4>
-              <div className="space-y-2">
-                {MATH_SITUATIONS.map((s) => { const sel = active.mathSituationId === s.id; const tip = !!tips[s.id]; return (
-                  <div key={s.id} className={`rounded-xl border-2 p-3 transition ${sel ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`} data-situation-id={s.id}>
+              <div className="space-y-1.5">
+                {MATH_SITUATIONS.map((s) => { const sel = active.mathSituationId === s.id; const tip = !!tips[s.id]; const revealed = revealAnswers ? isCoherent(active.routine!.id, s.id) : null; return (
+                  <div key={s.id} className={`rounded-xl border-2 p-2 transition ${sel ? 'border-brand-500 bg-brand-50' : 'border-slate-100 bg-white hover:border-brand-200'}`} data-situation-id={s.id}>
                     <div className="flex items-center justify-between gap-3">
-                      <div role="button" data-testid={`sit-${s.id}`} onClick={() => onSetSituation(active.id, sel ? null : s.id)} className="flex flex-1 cursor-pointer select-none items-center gap-3 py-0.5">
+                      <div role="button" data-testid={`sit-${s.id}`} onClick={() => onSetSituation(active.id, sel ? null : s.id, sel ? undefined : justDraft[active.id])} className="flex flex-1 cursor-pointer select-none items-center gap-3">
                         <span className={`rounded-full p-1 ${sel ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-400'}`}>{sel ? <Check size={14} /> : <span className="block h-3.5 w-3.5" />}</span><span className="text-sm text-slate-900">{s.label}</span></div>
-                      <button type="button" title={tip ? 'Ocultar Tip' : 'Mostrar Tip'} onClick={() => setTips((p) => ({ ...p, [s.id]: !p[s.id] }))} className={`rounded-xl border p-2 ${tip ? 'border-amber-300 bg-accent-soft' : 'border-slate-200 bg-slate-50 hover:bg-accent-soft'}`}><Lightbulb size={16} className="text-accent" /></button></div>
-                    {tip && <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-700"><span className="micro mb-1 flex items-center gap-1 !text-brand-500"><Lightbulb size={12} className="text-accent" />Tip de orientación</span>{s.description}</div>}
+                      {revealed !== null && (
+                        <span data-testid={`sit-reveal-${s.id}`} title={revealed ? 'Combinación coherente' : 'Combinación poco coherente'}>
+                          {revealed ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-rose-500" />}
+                        </span>)}
+                      <button type="button" title={tip ? 'Ocultar Tip' : 'Mostrar Tip'} onClick={() => setTips((p) => ({ ...p, [s.id]: !p[s.id] }))} className={`rounded-lg border p-1.5 ${tip ? 'border-amber-300 bg-accent-soft' : 'border-slate-200 bg-slate-50 hover:bg-accent-soft'}`}><Lightbulb size={14} className="text-accent" /></button></div>
+                    {tip && <div className="mt-1.5 rounded-xl border border-slate-200 bg-white p-2.5 text-xs leading-relaxed text-slate-700"><span className="micro mb-1 flex items-center gap-1 !text-brand-500"><Lightbulb size={12} className="text-accent" />Tip de orientación</span>{s.description}</div>}
                   </div>); })}
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                <label htmlFor="just" className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-600"><PenLine size={14} className="text-brand-500" />Justificación escrita (opcional) — ¿por qué esta situación es pertinente para esta rutina?</label>
+                <textarea id="just" data-testid="justification" rows={2} value={justDraft[active.id] ?? ''} onChange={(e) => setJustDraft((p) => ({ ...p, [active.id]: e.target.value }))}
+                  placeholder="Escribe tu razón antes de elegir arriba: se registra junto con la decisión." className="input w-full resize-none text-sm" />
+                <p className="mt-1 text-[10px] text-slate-400">Si la fase de esta rutina es Desarrollo, tu justificación se evalúa para IM10 (Apropiación de códigos de formulación). Si la dejas en blanco, el acto de formulación se registra igual por acción.</p>
               </div>
               <p className="mt-auto flex items-start gap-1.5 text-[11px] italic text-slate-500"><Search size={13} className="mt-0.5 shrink-0" />Después de elegir, presiona la lupa de la rutina para recibir la devolución de tu combinación.</p>
             </div>
